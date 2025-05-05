@@ -227,6 +227,7 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
     public CControl dockingControl;
     private DefaultSingleCDockable categoriesTabDock, metadataTabDock, bookmarksTabDock, evidenceTabDock;
     private List<DefaultSingleCDockable> rsTabDock = new ArrayList<DefaultSingleCDockable>();
+    private DefaultSingleCDockable helloWorldDock;
 
     private DefaultSingleCDockable tableTabDock, galleryTabDock, graphDock;
     public DefaultSingleCDockable hitsDock, subitemDock, parentDock, duplicateDock, referencesDock, referencedByDock;
@@ -424,7 +425,7 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
     }
 
     public ATextViewer getTextViewer() {
-        return viewerController.getTextViewer();
+       return viewerController.getTextViewer();
     }
 
     public ViewerController getViewerController() {
@@ -531,8 +532,11 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         filterDuplicates.setToolTipText(Messages.getString("App.FilterDuplicatesTip"));
 
         topPanel = new JPanel();
-        topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.LINE_AXIS));
-        topPanel.setAlignmentX(LEFT_ALIGNMENT);
+        topPanel.setLayout(new BorderLayout());
+        
+        JLabel helloLabel = new JLabel("Hello World");
+        helloLabel.setHorizontalAlignment(JLabel.CENTER);
+        topPanel.add(helloLabel, BorderLayout.CENTER);
 
         clearAllFilters = new ClearFilterButton();
         clearAllFilters.setMaximumSize(new Dimension(100, 100));
@@ -1195,7 +1199,7 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
 
         List<DefaultSingleCDockable> docks = new ArrayList<>();
         docks.addAll(Arrays.asList(hitsDock, subitemDock, duplicateDock, parentDock, tableTabDock, galleryTabDock, bookmarksTabDock, evidenceTabDock, metadataTabDock, categoriesTabDock, graphDock, referencesDock, referencedByDock,
-                filtersTabDock));
+                filtersTabDock, helloWorldDock));
         docks.addAll(viewerDocks);
         docks.addAll(rsTabDock);
         rsTabDock.clear();
@@ -1341,6 +1345,18 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         if (isReset)
             removeAllDockables();
         createAllDockables();
+
+        JPanel helloPanel = new JPanel(new BorderLayout());
+        JLabel helloLabel = new JLabel("Hello World");
+        helloLabel.setHorizontalAlignment(JLabel.CENTER);
+        helloLabel.setFont(helloLabel.getFont().deriveFont(24f)); // Make text bigger
+        helloPanel.add(helloLabel, BorderLayout.CENTER);
+        helloWorldDock = createDockable("helloworld", "Hello World", helloPanel);
+        dockingControl.addDockable(helloWorldDock);
+
+        // Position Hello World dock at the top
+        helloWorldDock.setLocation(CLocation.base().normalNorth(0.1));
+        helloWorldDock.setVisible(true);
 
         tableTabDock.setLocation(verticalLayout ? CLocation.base().normalNorth(0.7) : CLocation.base().normalNorth(0.5));
         tableTabDock.setVisible(true);

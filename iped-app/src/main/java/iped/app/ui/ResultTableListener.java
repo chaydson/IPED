@@ -86,6 +86,25 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
             return;
         }
 
+        int selectedRow = App.get().resultsTable.getSelectedRow();
+        if (selectedRow != -1) {
+            int modelRow = App.get().resultsTable.convertRowIndexToModel(selectedRow);
+            int nameCol = -1;
+            for (int i = 0; i < App.get().resultsTable.getColumnCount(); i++) {
+                String colName = App.get().resultsModel.getColumnFieldName(App.get().resultsTable.convertColumnIndexToModel(i));
+                if (colName.equalsIgnoreCase("name")) {
+                    nameCol = i;
+                    break;
+                }
+            }
+            if (nameCol != -1) {
+                Object chatName = App.get().resultsTable.getValueAt(selectedRow, nameCol);
+                if (chatName != null) {
+                    App.get().updateHelloWorldText(chatName.toString());
+                }
+            }
+        }
+
         int resultTableLeadSelIdx = App.get().resultsTable.getSelectionModel().getLeadSelectionIndex();
         Rectangle a = App.get().resultsTable.getCellRect(resultTableLeadSelIdx, 0, false);
         Rectangle b = App.get().resultsTable.getVisibleRect();

@@ -316,6 +316,8 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
 
     public SimilarFacesSearchFilterer similarFacesSearchFilterer;
 
+    private JLabel helloLabel;
+
     private App() {
     }
 
@@ -534,7 +536,7 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         topPanel = new JPanel();
         topPanel.setLayout(new BorderLayout());
         
-        JLabel helloLabel = new JLabel("Hello World");
+        helloLabel = new JLabel("Hello World");
         helloLabel.setHorizontalAlignment(JLabel.CENTER);
         topPanel.add(helloLabel, BorderLayout.CENTER);
 
@@ -1347,9 +1349,24 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         createAllDockables();
 
         JPanel helloPanel = new JPanel(new BorderLayout());
-        JLabel helloLabel = new JLabel("Hello World");
+        helloLabel = new JLabel("Hello World");
         helloLabel.setHorizontalAlignment(JLabel.CENTER);
         helloLabel.setFont(helloLabel.getFont().deriveFont(24f)); // Make text bigger
+        
+        // Add mouse listener to handle clicks
+        helloLabel.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                String newText = JOptionPane.showInputDialog(App.this, 
+                    "Enter new text:", 
+                    "Update Hello World Text",
+                    JOptionPane.PLAIN_MESSAGE);
+                if (newText != null && !newText.trim().isEmpty()) {
+                    updateHelloWorldText(newText);
+                }
+            }
+        });
+        
         helloPanel.add(helloLabel, BorderLayout.CENTER);
         helloWorldDock = createDockable("helloworld", "Hello World", helloPanel);
         dockingControl.addDockable(helloWorldDock);
@@ -2136,5 +2153,15 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
 
     public AppListener getAppletListener() {
         return appletListener;
+    }
+
+    public void updateHelloWorldText(String newText) {
+        if (helloLabel != null) {
+            helloLabel.setText(newText);
+        }
+    }
+
+    public DefaultSingleCDockable getHelloWorldDock() {
+        return helloWorldDock;
     }
 }

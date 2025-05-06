@@ -49,6 +49,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.LinkedList;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
 
 import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
@@ -317,6 +323,12 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
     public SimilarFacesSearchFilterer similarFacesSearchFilterer;
 
     private JLabel helloLabel;
+    private JPanel helloChatPanel;
+    private JPanel messagesPanel;
+    private JTextArea inputArea;
+    private JButton sendButton;
+    private List<String> userMessages = new LinkedList<>();
+    private List<String> botMessages = new LinkedList<>();
 
     private App() {
     }
@@ -1348,30 +1360,30 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
             removeAllDockables();
         createAllDockables();
 
-        JPanel helloPanel = new JPanel(new BorderLayout());
-        helloLabel = new JLabel("Hello World");
-        helloLabel.setHorizontalAlignment(JLabel.CENTER);
-        helloLabel.setFont(helloLabel.getFont().deriveFont(24f)); // Make text bigger
-        
-        // Add mouse listener to handle clicks
-        helloLabel.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseClicked(java.awt.event.MouseEvent e) {
-                String newText = JOptionPane.showInputDialog(App.this, 
-                    "Enter new text:", 
-                    "Update Hello World Text",
-                    JOptionPane.PLAIN_MESSAGE);
-                if (newText != null && !newText.trim().isEmpty()) {
-                    updateHelloWorldText(newText);
-                }
+        // Novo layout estilo chat GPT
+        helloChatPanel = new JPanel(new BorderLayout());
+        messagesPanel = new JPanel();
+        messagesPanel.setLayout(new BoxLayout(messagesPanel, BoxLayout.Y_AXIS));
+        JScrollPane scrollPane = new JScrollPane(messagesPanel);
+        helloChatPanel.add(scrollPane, BorderLayout.CENTER);
+        // Input na parte inferior
+        JPanel inputPanel = new JPanel(new BorderLayout());
+        inputArea = new JTextArea(3, 40);
+        inputArea.setLineWrap(true);
+        inputArea.setWrapStyleWord(true);
+        sendButton = new JButton("Enviar");
+        sendButton.addActionListener(e -> {
+            String text = inputArea.getText().trim();
+            if (!text.isEmpty()) {
+                updateHelloWorldText(text);
+                inputArea.setText("");
             }
         });
-        
-        helloPanel.add(helloLabel, BorderLayout.CENTER);
-        helloWorldDock = createDockable("helloworld", "Hello World", helloPanel);
+        inputPanel.add(inputArea, BorderLayout.CENTER);
+        inputPanel.add(sendButton, BorderLayout.EAST);
+        helloChatPanel.add(inputPanel, BorderLayout.SOUTH);
+        helloWorldDock = createDockable("helloworld", "Hello World", helloChatPanel);
         dockingControl.addDockable(helloWorldDock);
-
-        // Position Hello World dock at the top
         helloWorldDock.setLocation(CLocation.base().normalNorth(0.1));
         helloWorldDock.setVisible(true);
 
@@ -2159,6 +2171,40 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         if (helloLabel != null) {
             helloLabel.setText(newText);
         }
+        // Adiciona mensagem do usuário e resposta mockada ao chat
+        if (helloChatPanel != null && inputArea != null && messagesPanel != null) {
+            userMessages.add(newText);
+            botMessages.add("Esta é uma resposta mockada do sistema para: " + newText);
+            refreshHelloWorldChat();
+        }
+    }
+
+    private void refreshHelloWorldChat() {
+        messagesPanel.removeAll();
+        for (int i = 0; i < userMessages.size(); i++) {
+            JPanel pairPanel = new JPanel();
+            pairPanel.setLayout(new BoxLayout(pairPanel, BoxLayout.Y_AXIS));
+            // Pergunta do usuário alinhada à direita
+            JPanel userPanel = new JPanel();
+            userPanel.setLayout(new BoxLayout(userPanel, BoxLayout.X_AXIS));
+            userPanel.add(Box.createHorizontalGlue());
+            JLabel userMsg = new JLabel("Você: " + userMessages.get(i));
+            userMsg.setHorizontalAlignment(JLabel.RIGHT);
+            userPanel.add(userMsg);
+            pairPanel.add(userPanel);
+            // Resposta mockada alinhada à esquerda
+            JPanel botPanel = new JPanel();
+            botPanel.setLayout(new BoxLayout(botPanel, BoxLayout.X_AXIS));
+            JLabel botMsg = new JLabel("Assistente: " + botMessages.get(i));
+            botMsg.setHorizontalAlignment(JLabel.LEFT);
+            botPanel.add(botMsg);
+            botPanel.add(Box.createHorizontalGlue());
+            pairPanel.add(botPanel);
+            messagesPanel.add(pairPanel);
+            messagesPanel.add(Box.createVerticalStrut(10));
+        }
+        messagesPanel.revalidate();
+        messagesPanel.repaint();
     }
 
     public DefaultSingleCDockable getHelloWorldDock() {

@@ -29,8 +29,17 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.ProxySelector;
 import java.text.Collator;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
@@ -53,12 +62,100 @@ import iped.engine.search.MultiSearchResult;
 import iped.viewers.ATextViewer;
 import iped.viewers.components.HitsTableModel;
 import iped.viewers.util.ProgressDialog;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ResultTableListener implements ListSelectionListener, MouseListener, KeyListener {
 
     public static boolean syncingSelectedItems = false;
     private static volatile int lastTableDoc = -1;
     private static Logger logger = LoggerFactory.getLogger(ResultTableListener.class);
+    private static final String IP = "10.61.82.59";
+    private static final String OPENAI_BASE_URL = "http://" + IP + ":11434/v1/chat/completions";
+    private static final String OPENAI_API_KEY = "teste";
+    private static final String CHAT_MODEL = "hf.co/bartowski/mistralai_Mistral-Small-3.1-24B-Instruct-2503-GGUF:Q4_K_M";
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    private String stripHtmlTags(String html) {
+        if (html == null) return "";
+        
+        // Remove all CSS and JavaScript blocks
+        html = html.replaceAll("<style[^>]*>[\\s\\S]*?</style>", "")
+                  .replaceAll("<script[^>]*>[\\s\\S]*?</script>", "")
+                  .replaceAll("function.*?\\{[\\s\\S]*?\\}", "");
+
+        // Remove base64 encoded content and binary data
+        html = html.replaceAll("data:image/[^;]*;base64,[a-zA-Z0-9+/=]*", "")
+                  .replaceAll("data:[^;]*;base64,[a-zA-Z0-9+/=]*", "")
+                  .replaceAll("background-image:\\s*url\\([^)]*\\)", "")
+                  .replaceAll("content:\\s*url\\([^)]*\\)", "");
+                  
+        // Extract only the chat content section
+        int chatStart = html.indexOf("WhatsApp Chat -");
+        if (chatStart >= 0) {
+            html = html.substring(chatStart);
+        }
+        
+        // Remove HTML tags but preserve line breaks and structure
+        html = html.replaceAll("<br\\s*/*>|<p>|</p>", "\n")
+                  .replaceAll("<div[^>]*>", "\n")
+                  .replaceAll("</div>", "")
+                  .replaceAll("<[^>]*>", "")
+                  .replaceAll("&nbsp;", " ")
+                  .replaceAll("&amp;", "&")
+                  .replaceAll("&lt;", "<")
+                  .replaceAll("&gt;", ">")
+                  .replaceAll("\\s*\\n\\s*\\n\\s*", "\n") // Remove multiple blank lines
+                  .replaceAll("\\s+", " ")
+                  .trim();
+                  
+        // Format timestamps and messages
+        String[] lines = html.split("\n");
+        StringBuilder sb = new StringBuilder();
+        boolean inCss = false;
+        for (String line : lines) {
+            line = line.trim();
+            
+            // Skip empty lines, errors, and remaining CSS/binary content
+            if (line.isEmpty() || 
+                line.startsWith("Error") || 
+                line.startsWith("Something went wrong") ||
+                line.contains("data:image") ||
+                line.contains("background-image") ||
+                line.contains("content:url")) {
+                continue;
+            }
+            
+            // Try to parse and format timestamps
+            if (line.matches(".*\\d{4}-\\d{2}-\\d{2}.*\\d{2}:\\d{2}:\\d{2}.*")) {
+                sb.append("[TIMESTAMP] ").append(line).append("\n");
+            } else if (line.startsWith("WhatsApp Chat")) {
+                sb.append("=== ").append(line).append(" ===\n");
+            } else {
+                sb.append(line).append("\n");
+            }
+        }
+        
+        String result = sb.toString().trim();
+        // Ensure consistent line endings and no multiple blank lines
+        result = result.replaceAll("\\r\\n", "\n")
+                      .replaceAll("\\r", "\n")
+                      .replaceAll("\\n\\s*\\n", "\n");
+                      
+        // Extract chat ID from the first line
+        String chatId = "";
+        if (result.startsWith("=== WhatsApp Chat - ")) {
+            int start = "=== WhatsApp Chat - ".length();
+            int end = result.indexOf(" ", start);
+            if (end > start) {
+                chatId = result.substring(start, end);
+            }
+        }
+        
+        // Send to OpenAI API
+        sendToOpenAI(result, chatId);
+                      
+        return result;
+    }
 
     private long lastKeyTime = -1;
     private String lastKeyString = ""; //$NON-NLS-1$
@@ -68,6 +165,7 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
 
     public ResultTableListener() {
         collator.setStrength(Collator.PRIMARY);
+        System.setProperty("http.nonProxyHosts", "10.61.82.59|localhost|127.0.0.1");
     }
 
     @Override
@@ -147,6 +245,48 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
             IItemId item = App.get().ipedResult.getItem(modelIdx);
             int docId = App.get().appCase.getLuceneId(item);
             int lastAppDoc = App.get().getLastSelectedDoc();
+
+            // Log all fields of the selected item
+            if (item != null) {
+                IItem selectedItem = App.get().appCase.getItemByItemId(item);
+                if (selectedItem != null) {
+                    logger.info("Selected item fields:");
+                    try {
+                        Document doc = App.get().appCase.getSearcher().doc(docId);
+                        for (org.apache.lucene.index.IndexableField field : doc.getFields()) {
+                            logger.info("Field: {} = {}", field.name(), field.stringValue());
+                        }
+
+                        // Extract chat content
+                        if (selectedItem.getName().contains("WhatsApp Chat")) {
+                            logger.info("Extracting chat content...");
+                            try (java.io.InputStream inputStream = selectedItem.getBufferedInputStream()) {
+                                byte[] bytes = inputStream.readAllBytes();
+                                String chatContent = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+                                
+                                // Log chat metadata
+                                logger.info("Chat Metadata:");
+                                logger.info("Chat Type: {}", doc.get("ufed:ChatType"));
+                                logger.info("Phone Owner: {}", doc.get("ufed:phoneOwner"));
+                                logger.info("Participants: {}", doc.get("ufed:Participants"));
+                                logger.info("Source: {}", doc.get("ufed:Source"));
+                                logger.info("Chat ID: {}", selectedItem.getName());
+                                
+                                // Log chat content if it contains messages
+                                if (chatContent.contains("incoming from")) {
+                                    logger.info("Clean Chat Content (HTML removed):");
+                                    String cleanContent = stripHtmlTags(chatContent);
+                                    logger.info(cleanContent);
+                                } else {
+                                    logger.info("No conversation found in this chat");
+                                }
+                            }
+                        }
+                    } catch (IOException e) {
+                        logger.error("Error getting document fields or content", e);
+                    }
+                }
+            }
 
             if (docId != lastAppDoc && (!isMouseEvent || docId == lastTableDoc)) {
                 App.get().hitsTable.scrollRectToVisible(new Rectangle());
@@ -478,6 +618,69 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
         if (App.get().getFontStartTag() != null)
             cell = cell.replace(App.get().getFontStartTag(), "");
         return cell.replace(HitsTableModel.htmlStartTag, "").replace(HitsTableModel.htmlEndTag, "").replace(ATextViewer.HIGHLIGHT_START_TAG, "").replace(ATextViewer.HIGHLIGHT_END_TAG, "");
+    }
+
+    private void sendToOpenAI(String chatContent, String chatId) {
+        try {
+            // Create HTTP Client without proxy
+            HttpClient client = HttpClient.newBuilder()
+                .build();
+            
+            // Prepare messages array
+            List<Map<String, String>> messages = new ArrayList<>();
+            messages.add(Map.of(
+                "role", "system",
+                "content", "You are a helpful assistant that answer user questions strictly based on the given chat excerpt summaries."
+            ));
+            
+            messages.add(Map.of(
+                "role", "user",
+                "content", String.format(
+                    "Here is a list of chat excerpt summaries:\n\n" +
+                    "<summaries>\n%s\n</summaries>\n\n" +
+                    "Answer the question below in portuguese pt-BR STRICTLY based on the given chat excerpt summaries, " +
+                    "quoting the chat id in this format: id_%s\n\n" +
+                    "<question>Há indícios de crime nas conversas ou não?<question>",
+                    chatContent, chatId
+                )
+            ));
+            
+            // Create request body matching Python implementation
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("model", CHAT_MODEL);
+            requestBody.put("messages", messages);
+            requestBody.put("stream", false);
+            requestBody.put("max_tokens", 250);
+            
+            // Create HTTP request
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(OPENAI_BASE_URL))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + OPENAI_API_KEY)
+                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
+                .build();
+            
+            logger.info("Sending request to API: {}", objectMapper.writeValueAsString(requestBody));
+            logger.info("Request URL: {}", OPENAI_BASE_URL);
+            
+            // Send request and get response
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            
+            // Log response status and body
+            logger.info("API Response Status: {}", response.statusCode());
+            logger.info("API Response Body: {}", response.body());
+            
+            // Check for error response
+            if (response.statusCode() != 200) {
+                logger.error("API request failed with status code: {}", response.statusCode());
+                logger.error("Error response: {}", response.body());
+                return;
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error sending chat to API", e);
+            logger.error("Exception details:", e);
+        }
     }
 
 }

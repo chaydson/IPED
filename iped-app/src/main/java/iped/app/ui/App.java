@@ -189,6 +189,7 @@ import iped.viewers.api.ResultSetViewer;
 import iped.viewers.api.ResultSetViewerConfiguration;
 import iped.viewers.components.HitsTable;
 import iped.viewers.components.HitsTableModel;
+import java.awt.FlowLayout;
 
 public class App extends JFrame implements WindowListener, IMultiSearchResultProvider, GUIProvider {
     /**
@@ -2211,32 +2212,23 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         helloChatPanel.setLayout(new BorderLayout());
         helloChatPanel.add(scrollPane, BorderLayout.CENTER);
         
+        int bubbleWidth = 350;
         for (ChatMessage msg : chatMessages) {
-            JPanel msgPanel = new JPanel();
-            msgPanel.setLayout(new BoxLayout(msgPanel, BoxLayout.X_AXIS));
-            if (msg.isUser) {
-                msgPanel.add(Box.createHorizontalGlue());
-                JTextArea userMsg = new JTextArea("Você: " + msg.text);
-                userMsg.setLineWrap(true);
-                userMsg.setWrapStyleWord(true);
-                userMsg.setEditable(false);
-                userMsg.setOpaque(true);
-                userMsg.setBackground(new Color(220, 248, 198)); // #DCF8C6
-                userMsg.setBorder(javax.swing.BorderFactory.createEmptyBorder(5, 8, 5, 8));
-                userMsg.setMaximumSize(new Dimension(350, Integer.MAX_VALUE));
-                msgPanel.add(userMsg);
-            } else {
-                JTextArea botMsg = new JTextArea("Assistente: " + msg.text);
-                botMsg.setLineWrap(true);
-                botMsg.setWrapStyleWord(true);
-                botMsg.setEditable(false);
-                botMsg.setOpaque(true);
-                botMsg.setBackground(new Color(232, 232, 232)); // #E8E8E8
-                botMsg.setBorder(javax.swing.BorderFactory.createEmptyBorder(5, 8, 5, 8));
-                botMsg.setMaximumSize(new Dimension(350, Integer.MAX_VALUE));
-                msgPanel.add(botMsg);
-                msgPanel.add(Box.createHorizontalGlue());
-            }
+            JPanel msgPanel = new JPanel(new FlowLayout(msg.isUser ? FlowLayout.RIGHT : FlowLayout.LEFT));
+            msgPanel.setOpaque(false);
+            JTextArea msgArea = new JTextArea((msg.isUser ? "Você: " : "Assistente: ") + msg.text);
+            msgArea.setLineWrap(true);
+            msgArea.setWrapStyleWord(true);
+            msgArea.setEditable(false);
+            msgArea.setOpaque(true);
+            msgArea.setBackground(msg.isUser ? new Color(220, 248, 198) : new Color(232, 232, 232));
+            msgArea.setBorder(javax.swing.BorderFactory.createEmptyBorder(5, 8, 5, 8));
+            msgArea.setFont(messagesPanel.getFont());
+            msgArea.setColumns(30); // Aproximadamente 350px
+            msgArea.setSize(bubbleWidth, Short.MAX_VALUE);
+            msgArea.setPreferredSize(new Dimension(bubbleWidth, msgArea.getPreferredSize().height));
+            msgArea.setMaximumSize(new Dimension(bubbleWidth, Integer.MAX_VALUE));
+            msgPanel.add(msgArea);
             messagesPanel.add(msgPanel);
             messagesPanel.add(Box.createVerticalStrut(10));
         }

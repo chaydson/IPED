@@ -1372,16 +1372,26 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         inputArea = new JTextArea(3, 40);
         inputArea.setLineWrap(true);
         inputArea.setWrapStyleWord(true);
-        sendButton = new JButton("Enviar");
-        sendButton.addActionListener(e -> {
-            String text = inputArea.getText().trim();
-            if (!text.isEmpty()) {
-                addUserMessage(text);
-                inputArea.setText("");
+        inputArea.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    if (e.isShiftDown()) {
+                        // Shift+Enter: Insere quebra de linha
+                        inputArea.append("\n");
+                    } else {
+                        // Enter: Envia mensagem
+                        e.consume(); // Previne a quebra de linha padrão
+                        String text = inputArea.getText().trim();
+                        if (!text.isEmpty()) {
+                            addUserMessage(text);
+                            inputArea.setText("");
+                        }
+                    }
+                }
             }
         });
         inputPanel.add(inputArea, BorderLayout.CENTER);
-        inputPanel.add(sendButton, BorderLayout.EAST);
         helloChatPanel.add(inputPanel, BorderLayout.SOUTH);
         helloWorldDock = createDockable("helloworld", "Hello World", helloChatPanel);
         dockingControl.addDockable(helloWorldDock);
@@ -2233,10 +2243,8 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
             messagesPanel.add(Box.createVerticalStrut(10));
         }
         messagesPanel.add(Box.createVerticalGlue());
-        JPanel inputPanel = new JPanel();
-        inputPanel.setLayout(new BorderLayout());
+        JPanel inputPanel = new JPanel(new BorderLayout());
         inputPanel.add(inputArea, BorderLayout.CENTER);
-        inputPanel.add(sendButton, BorderLayout.EAST);
         helloChatPanel.add(inputPanel, BorderLayout.SOUTH);
         messagesPanel.revalidate();
         messagesPanel.repaint();

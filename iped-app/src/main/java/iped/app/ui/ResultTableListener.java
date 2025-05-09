@@ -150,9 +150,14 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
                 chatId = result.substring(start, end);
             }
         }
+
+        final String finalResult = result;
+        final String finalChatId = chatId;
         
         // Send to OpenAI API
-        sendToOpenAI(result, chatId);
+        executor.execute(() -> {
+            sendToOpenAI(finalResult, finalChatId);
+        });
                       
         return result;
     }
@@ -675,6 +680,20 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
                 logger.error("API request failed with status code: {}", response.statusCode());
                 logger.error("Error response: {}", response.body());
                 return;
+            }
+
+            // Parse the response and extract the assistant's message
+            Map<String, Object> responseMap = objectMapper.readValue(response.body(), Map.class);
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) responseMap.get("choices");
+            if (choices != null && !choices.isEmpty()) {
+                Map<String, Object> choice = choices.get(0);
+                Map<String, String> message = (Map<String, String>) choice.get("message");
+                String content = message.get("content");
+                
+                // Update the chat with the API response
+                SwingUtilities.invokeLater(() -> {
+                    App.get().updateHelloWorldText(content);
+                });
             }
             
         } catch (Exception e) {

@@ -1375,7 +1375,7 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         sendButton.addActionListener(e -> {
             String text = inputArea.getText().trim();
             if (!text.isEmpty()) {
-                updateHelloWorldText(text);
+                addUserMessage(text);
                 inputArea.setText("");
             }
         });
@@ -2171,43 +2171,92 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         if (helloLabel != null) {
             helloLabel.setText(newText);
         }
-        // Adiciona mensagem do usuário e resposta mockada ao chat
+        // Adiciona resposta da API ao chat
         if (helloChatPanel != null && inputArea != null && messagesPanel != null) {
-            userMessages.add(newText);
-            botMessages.add("Esta é uma resposta mockada do sistema para: " + newText);
-            refreshHelloWorldChat();
+            // Se não for uma mensagem do usuário, é uma resposta da API
+            if (userMessages.isEmpty() || !newText.equals(userMessages.get(userMessages.size() - 1))) {
+                botMessages.add(newText);
+                SwingUtilities.invokeLater(() -> {
+                    refreshHelloWorldChat();
+                });
+            }
         }
     }
 
     private void refreshHelloWorldChat() {
+        if (messagesPanel == null) return;
+        
         messagesPanel.removeAll();
-        for (int i = 0; i < userMessages.size(); i++) {
+        messagesPanel.setLayout(new BoxLayout(messagesPanel, BoxLayout.Y_AXIS));
+        
+        // Adiciona um painel de rolagem
+        JScrollPane scrollPane = new JScrollPane(messagesPanel);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        
+        // Adiciona o painel de rolagem ao painel principal
+        helloChatPanel.removeAll();
+        helloChatPanel.setLayout(new BorderLayout());
+        helloChatPanel.add(scrollPane, BorderLayout.CENTER);
+        
+        // Adiciona as mensagens
+        for (int i = 0; i < Math.max(userMessages.size(), botMessages.size()); i++) {
             JPanel pairPanel = new JPanel();
             pairPanel.setLayout(new BoxLayout(pairPanel, BoxLayout.Y_AXIS));
-            // Pergunta do usuário alinhada à direita
-            JPanel userPanel = new JPanel();
-            userPanel.setLayout(new BoxLayout(userPanel, BoxLayout.X_AXIS));
-            userPanel.add(Box.createHorizontalGlue());
-            JLabel userMsg = new JLabel("Você: " + userMessages.get(i));
-            userMsg.setHorizontalAlignment(JLabel.RIGHT);
-            userPanel.add(userMsg);
-            pairPanel.add(userPanel);
-            // Resposta mockada alinhada à esquerda
-            JPanel botPanel = new JPanel();
-            botPanel.setLayout(new BoxLayout(botPanel, BoxLayout.X_AXIS));
-            JLabel botMsg = new JLabel("Assistente: " + botMessages.get(i));
-            botMsg.setHorizontalAlignment(JLabel.LEFT);
-            botPanel.add(botMsg);
-            botPanel.add(Box.createHorizontalGlue());
-            pairPanel.add(botPanel);
+            
+            // Mensagem do usuário (se existir)
+            if (i < userMessages.size()) {
+                JPanel userPanel = new JPanel();
+                userPanel.setLayout(new BoxLayout(userPanel, BoxLayout.X_AXIS));
+                userPanel.add(Box.createHorizontalGlue());
+                JLabel userMsg = new JLabel("<html><div style='background-color: #DCF8C6; padding: 5px; border-radius: 5px;'>Você: " + userMessages.get(i) + "</div></html>");
+                userMsg.setHorizontalAlignment(JLabel.RIGHT);
+                userPanel.add(userMsg);
+                pairPanel.add(userPanel);
+            }
+            
+            // Mensagem do bot (se existir)
+            if (i < botMessages.size()) {
+                JPanel botPanel = new JPanel();
+                botPanel.setLayout(new BoxLayout(botPanel, BoxLayout.X_AXIS));
+                JLabel botMsg = new JLabel("<html><div style='background-color: #E8E8E8; padding: 5px; border-radius: 5px;'>Assistente: " + botMessages.get(i) + "</div></html>");
+                botMsg.setHorizontalAlignment(JLabel.LEFT);
+                botPanel.add(botMsg);
+                botPanel.add(Box.createHorizontalGlue());
+                pairPanel.add(botPanel);
+            }
+            
             messagesPanel.add(pairPanel);
-            messagesPanel.add(Box.createVerticalStrut(10));
+            messagesPanel.add(Box.createVerticalStrut(10)); // Espaço entre mensagens
         }
+        
+        // Adiciona espaço no final para empurrar as mensagens para cima
+        messagesPanel.add(Box.createVerticalGlue());
+        
+        // Recria o painel de entrada
+        JPanel inputPanel = new JPanel();
+        inputPanel.setLayout(new BorderLayout());
+        inputPanel.add(inputArea, BorderLayout.CENTER);
+        inputPanel.add(sendButton, BorderLayout.EAST);
+        
+        // Adiciona o painel de entrada ao chat
+        helloChatPanel.add(inputPanel, BorderLayout.SOUTH);
+        
+        // Atualiza a interface
         messagesPanel.revalidate();
         messagesPanel.repaint();
+        helloChatPanel.revalidate();
+        helloChatPanel.repaint();
     }
 
     public DefaultSingleCDockable getHelloWorldDock() {
         return helloWorldDock;
+    }
+
+    private void addUserMessage(String text) {
+        if (helloChatPanel != null && messagesPanel != null) {
+            userMessages.add(text);
+            refreshHelloWorldChat();
+        }
     }
 }

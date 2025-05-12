@@ -184,7 +184,7 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
             if (nameCol != -1) {
                 Object chatName = App.get().resultsTable.getValueAt(selectedRow, nameCol);
                 if (chatName != null) {
-                    App.get().updateHelloWorldText(chatName.toString());
+                    App.get().updateChatText(chatName.toString());
                 }
             }
         }
@@ -676,7 +676,7 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
                 
                 // Update the chat with the API response
                 SwingUtilities.invokeLater(() -> {
-                    App.get().updateHelloWorldText(content);
+                    App.get().updateChatText(content);
                 });
             }
             

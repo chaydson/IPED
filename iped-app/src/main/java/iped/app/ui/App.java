@@ -237,7 +237,7 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
     public CControl dockingControl;
     private DefaultSingleCDockable categoriesTabDock, metadataTabDock, bookmarksTabDock, evidenceTabDock;
     private List<DefaultSingleCDockable> rsTabDock = new ArrayList<DefaultSingleCDockable>();
-    private DefaultSingleCDockable helloWorldDock;
+    private DefaultSingleCDockable chatDock;
 
     private DefaultSingleCDockable tableTabDock, galleryTabDock, graphDock;
     public DefaultSingleCDockable hitsDock, subitemDock, parentDock, duplicateDock, referencesDock, referencedByDock;
@@ -326,8 +326,8 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
 
     public SimilarFacesSearchFilterer similarFacesSearchFilterer;
 
-    private JLabel helloLabel;
-    private JPanel helloChatPanel;
+    private JLabel chatLabel;
+    private JPanel chatPanel;
     private JPanel messagesPanel;
     private JTextArea inputArea;
     private JButton sendButton;
@@ -599,9 +599,9 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         topPanel = new JPanel();
         topPanel.setLayout(new BorderLayout());
         
-        helloLabel = new JLabel("Hello World");
-        helloLabel.setHorizontalAlignment(JLabel.CENTER);
-        topPanel.add(helloLabel, BorderLayout.CENTER);
+        chatLabel = new JLabel("Fala, Perito!");
+        chatLabel.setHorizontalAlignment(JLabel.CENTER);
+        topPanel.add(chatLabel, BorderLayout.CENTER);
 
         clearAllFilters = new ClearFilterButton();
         clearAllFilters.setMaximumSize(new Dimension(100, 100));
@@ -1267,7 +1267,7 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
 
         List<DefaultSingleCDockable> docks = new ArrayList<>();
         docks.addAll(Arrays.asList(hitsDock, subitemDock, duplicateDock, parentDock, tableTabDock, galleryTabDock, bookmarksTabDock, evidenceTabDock, metadataTabDock, categoriesTabDock, graphDock, referencesDock, referencedByDock,
-                filtersTabDock, helloWorldDock));
+                filtersTabDock, chatDock));
         docks.addAll(viewerDocks);
         docks.addAll(rsTabDock);
         rsTabDock.clear();
@@ -1415,11 +1415,11 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         createAllDockables();
 
         // Novo layout estilo chat GPT
-        helloChatPanel = new JPanel(new BorderLayout());
+        chatPanel = new JPanel(new BorderLayout());
         messagesPanel = new JPanel();
         messagesPanel.setLayout(new BoxLayout(messagesPanel, BoxLayout.Y_AXIS));
         JScrollPane scrollPane = new JScrollPane(messagesPanel);
-        helloChatPanel.add(scrollPane, BorderLayout.CENTER);
+        chatPanel.add(scrollPane, BorderLayout.CENTER);
         // Input na parte inferior
         JPanel inputPanel = new JPanel(new BorderLayout());
         inputArea = new JTextArea(3, 40);
@@ -1445,11 +1445,11 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
             }
         });
         inputPanel.add(inputArea, BorderLayout.CENTER);
-        helloChatPanel.add(inputPanel, BorderLayout.SOUTH);
-        helloWorldDock = createDockable("helloworld", "Hello World", helloChatPanel);
-        dockingControl.addDockable(helloWorldDock);
-        helloWorldDock.setLocation(CLocation.base().normalNorth(0.1));
-        helloWorldDock.setVisible(true);
+        chatPanel.add(inputPanel, BorderLayout.SOUTH);
+        chatDock = createDockable("chat", "Fala, Perito!", chatPanel);
+        dockingControl.addDockable(chatDock);
+        chatDock.setLocation(CLocation.base().normalNorth(0.1));
+        chatDock.setVisible(true);
 
         tableTabDock.setLocation(verticalLayout ? CLocation.base().normalNorth(0.7) : CLocation.base().normalNorth(0.5));
         tableTabDock.setVisible(true);
@@ -2243,23 +2243,23 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
 
     private List<ChatMessage> chatMessages = new LinkedList<>();
 
-    public void updateHelloWorldText(String newText) {
-        if (helloLabel != null) {
-            helloLabel.setText(newText);
+    public void updateChatText(String newText) {
+        if (chatLabel != null) {
+            chatLabel.setText(newText);
         }
         // Adiciona resposta da API ao chat
-        if (helloChatPanel != null && inputArea != null && messagesPanel != null) {
+        if (chatPanel != null && inputArea != null && messagesPanel != null) {
             // Hide loading indicator before adding the response
             hideLoading();
             chatMessages.add(new ChatMessage(newText, false)); // false = bot
-            SwingUtilities.invokeLater(this::refreshHelloWorldChat);
+            SwingUtilities.invokeLater(this::refreshChat);
         }
     }
 
     private void addUserMessage(String text) {
-        if (helloChatPanel != null && inputArea != null && messagesPanel != null) {
+        if (chatPanel != null && inputArea != null && messagesPanel != null) {
             chatMessages.add(new ChatMessage(text, true)); // true = usuário
-            SwingUtilities.invokeLater(this::refreshHelloWorldChat);
+            SwingUtilities.invokeLater(this::refreshChat);
             
             // Show loading indicator
             showLoading();
@@ -2273,7 +2273,7 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         }
     }
 
-    private void refreshHelloWorldChat() {
+    private void refreshChat() {
         if (messagesPanel == null) return;
         
         messagesPanel.removeAll();
@@ -2283,15 +2283,17 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         
-        helloChatPanel.removeAll();
-        helloChatPanel.setLayout(new BorderLayout());
-        helloChatPanel.add(scrollPane, BorderLayout.CENTER);
+        chatPanel.removeAll();
+        chatPanel.setLayout(new BorderLayout());
+        chatPanel.add(scrollPane, BorderLayout.CENTER);
         
         int bubbleWidth = 350;
+        boolean isFirstBotMessage = true;
         for (ChatMessage msg : chatMessages) {
             JPanel msgPanel = new JPanel(new FlowLayout(msg.isUser ? FlowLayout.RIGHT : FlowLayout.LEFT));
             msgPanel.setOpaque(false);
-            JTextArea msgArea = new JTextArea((msg.isUser ? "Você: " : "Assistente: ") + msg.text);
+            String prefix = msg.isUser ? "Você: " : (isFirstBotMessage ? "Fala, Perito! Sou o assistente do IPED, como posso te ajudar?\n" : "");
+            JTextArea msgArea = new JTextArea(prefix + msg.text);
             msgArea.setLineWrap(true);
             msgArea.setWrapStyleWord(true);
             msgArea.setEditable(false);
@@ -2306,6 +2308,10 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
             msgPanel.add(msgArea);
             messagesPanel.add(msgPanel);
             messagesPanel.add(Box.createVerticalStrut(5)); // Espaçamento fixo de 5 pixels
+            
+            if (!msg.isUser) {
+                isFirstBotMessage = false;
+            }
         }
 
         // Add loading indicator if visible
@@ -2320,17 +2326,17 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         messagesPanel.add(Box.createVerticalGlue());
         JPanel inputPanel = new JPanel(new BorderLayout());
         inputPanel.add(inputArea, BorderLayout.CENTER);
-        helloChatPanel.add(inputPanel, BorderLayout.SOUTH);
+        chatPanel.add(inputPanel, BorderLayout.SOUTH);
         messagesPanel.revalidate();
         messagesPanel.repaint();
-        helloChatPanel.revalidate();
-        helloChatPanel.repaint();
+        chatPanel.revalidate();
+        chatPanel.repaint();
         SwingUtilities.invokeLater(() -> {
             scrollPane.getVerticalScrollBar().setValue(scrollPane.getVerticalScrollBar().getMaximum());
         });
     }
 
-    public DefaultSingleCDockable getHelloWorldDock() {
-        return helloWorldDock;
+    public DefaultSingleCDockable getChatDock() {
+        return chatDock;
     }
 }

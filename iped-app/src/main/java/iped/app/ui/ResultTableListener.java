@@ -74,6 +74,7 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
     private static final String OPENAI_API_KEY = "teste";
     private static final String CHAT_MODEL = "hf.co/bartowski/mistralai_Mistral-Small-3.1-24B-Instruct-2503-GGUF:Q4_K_M";
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final Executor executor = Executors.newSingleThreadExecutor();
 
     private String stripHtmlTags(String html) {
         if (html == null) return "";
@@ -141,32 +142,12 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
                       .replaceAll("\\r", "\n")
                       .replaceAll("\\n\\s*\\n", "\n");
                       
-        // Extract chat ID from the first line
-        String chatId = "";
-        if (result.startsWith("=== WhatsApp Chat - ")) {
-            int start = "=== WhatsApp Chat - ".length();
-            int end = result.indexOf(" ", start);
-            if (end > start) {
-                chatId = result.substring(start, end);
-            }
-        }
-
-        final String finalResult = result;
-        final String finalChatId = chatId;
-        
-        // Send to OpenAI API
-        executor.execute(() -> {
-            sendToOpenAI(finalResult, finalChatId);
-        });
-                      
         return result;
     }
 
     private long lastKeyTime = -1;
     private String lastKeyString = ""; //$NON-NLS-1$
     private Collator collator = Collator.getInstance();
-
-    private Executor executor = Executors.newSingleThreadExecutor();
 
     public ResultTableListener() {
         collator.setStrength(Collator.PRIMARY);
@@ -242,7 +223,6 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
     }
 
     private synchronized void processSelectedFile(boolean isMouseEvent) {
-
         int viewIndex = App.get().resultsTable.getSelectionModel().getLeadSelectionIndex();
 
         if (viewIndex != -1) {
@@ -277,12 +257,14 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
                                 logger.info("Source: {}", doc.get("ufed:Source"));
                                 logger.info("Chat ID: {}", selectedItem.getName());
                                 
-                                // Log chat content if it contains messages
+                                // Store clean chat content for later use
                                 if (chatContent.contains("incoming from")) {
-                                    logger.info("Clean Chat Content (HTML removed):");
                                     String cleanContent = stripHtmlTags(chatContent);
+                                    App.get().setCurrentChatText(cleanContent);
+                                    logger.info("Clean Chat Content (HTML removed):");
                                     logger.info(cleanContent);
                                 } else {
+                                    App.get().setCurrentChatText("");
                                     logger.info("No conversation found in this chat");
                                 }
                             }
@@ -625,7 +607,7 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
         return cell.replace(HitsTableModel.htmlStartTag, "").replace(HitsTableModel.htmlEndTag, "").replace(ATextViewer.HIGHLIGHT_START_TAG, "").replace(ATextViewer.HIGHLIGHT_END_TAG, "");
     }
 
-    private void sendToOpenAI(String chatContent, String chatId) {
+    public static void sendToOpenAI(String chatContent, String userQuestion) {
         try {
             // Create HTTP Client without proxy
             HttpClient client = HttpClient.newBuilder()
@@ -641,12 +623,14 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
             messages.add(Map.of(
                 "role", "user",
                 "content", String.format(
-                    "Here is a list of chat excerpt summaries:\n\n" +
-                    "<summaries>\n%s\n</summaries>\n\n" +
-                    "Answer the question below in portuguese pt-BR STRICTLY based on the given chat excerpt summaries, " +
+                    "This is a WhatsApp chat:\n\n" +
+                    "<chat>\n%s\n</chat>\n\n" +
+                    "Answer the following question in portuguese pt-BR STRICTLY based on the given chat excerpt, " +
                     "quoting the chat id in this format: id_%s\n\n" +
-                    "<question>Há indícios de crime nas conversas ou não?<question>",
-                    chatContent, chatId
+                    "<question>%s</question>",
+                    chatContent, 
+                    chatContent.split("\n")[0].replace("=== WhatsApp Chat - ", "").split(" ")[0],
+                    userQuestion
                 )
             ));
             

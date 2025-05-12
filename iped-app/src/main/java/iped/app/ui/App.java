@@ -190,6 +190,9 @@ import iped.viewers.api.ResultSetViewerConfiguration;
 import iped.viewers.components.HitsTable;
 import iped.viewers.components.HitsTableModel;
 import java.awt.FlowLayout;
+import javax.swing.Timer;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 public class App extends JFrame implements WindowListener, IMultiSearchResultProvider, GUIProvider {
     /**
@@ -330,8 +333,55 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
     private JButton sendButton;
     private List<String> userMessages = new LinkedList<>();
     private List<String> botMessages = new LinkedList<>();
+    private String currentChatText = "";
+    private JLabel loadingLabel;
+    private Timer loadingTimer;
+    private int loadingDots = 0;
+    private Executor executor = Executors.newSingleThreadExecutor();
 
     private App() {
+    }
+
+    public String getCurrentChatText() {
+        return currentChatText;
+    }
+
+    public void setCurrentChatText(String text) {
+        this.currentChatText = text;
+    }
+
+    private void createLoadingIndicator() {
+        loadingLabel = new JLabel("Assistente está digitando...");
+        loadingLabel.setHorizontalAlignment(JLabel.CENTER);
+        loadingLabel.setVisible(false);
+        
+        // Create timer for loading animation
+        loadingTimer = new Timer(500, e -> {
+            loadingDots = (loadingDots + 1) % 4;
+            String dots = ".".repeat(loadingDots);
+            loadingLabel.setText("Assistente está digitando" + dots);
+        });
+    }
+
+    public void showLoading() {
+        if (loadingLabel != null) {
+            loadingLabel.setVisible(true);
+            loadingTimer.start();
+            messagesPanel.add(loadingLabel);
+            messagesPanel.add(Box.createVerticalStrut(10));
+            messagesPanel.revalidate();
+            messagesPanel.repaint();
+        }
+    }
+
+    public void hideLoading() {
+        if (loadingLabel != null) {
+            loadingTimer.stop();
+            loadingLabel.setVisible(false);
+            messagesPanel.remove(loadingLabel);
+            messagesPanel.revalidate();
+            messagesPanel.repaint();
+        }
     }
 
     public static final App get() {
@@ -853,6 +903,9 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         setupKeyboardShortcuts();
 
         LOGGER.info("UI created"); //$NON-NLS-1$
+
+        // Initialize loading indicator
+        createLoadingIndicator();
     }
 
     private void setupItemTable(HitsTable itemTable) {
@@ -2196,6 +2249,8 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         }
         // Adiciona resposta da API ao chat
         if (helloChatPanel != null && inputArea != null && messagesPanel != null) {
+            // Hide loading indicator before adding the response
+            hideLoading();
             chatMessages.add(new ChatMessage(newText, false)); // false = bot
             SwingUtilities.invokeLater(this::refreshHelloWorldChat);
         }
@@ -2205,6 +2260,16 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         if (helloChatPanel != null && inputArea != null && messagesPanel != null) {
             chatMessages.add(new ChatMessage(text, true)); // true = usuário
             SwingUtilities.invokeLater(this::refreshHelloWorldChat);
+            
+            // Show loading indicator
+            showLoading();
+            
+            // Send to API with the current chat text and user's question
+            if (!currentChatText.isEmpty()) {
+                executor.execute(() -> {
+                    ResultTableListener.sendToOpenAI(currentChatText, text);
+                });
+            }
         }
     }
 
@@ -2240,8 +2305,18 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
             msgArea.setMaximumSize(new Dimension(bubbleWidth, Integer.MAX_VALUE));
             msgPanel.add(msgArea);
             messagesPanel.add(msgPanel);
-            messagesPanel.add(Box.createVerticalStrut(10));
+            messagesPanel.add(Box.createVerticalStrut(5)); // Espaçamento fixo de 5 pixels
         }
+
+        // Add loading indicator if visible
+        if (loadingLabel != null && loadingLabel.isVisible()) {
+            JPanel loadingPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            loadingPanel.setOpaque(false);
+            loadingPanel.add(loadingLabel);
+            messagesPanel.add(loadingPanel);
+            messagesPanel.add(Box.createVerticalStrut(5)); // Mesmo espaçamento para o indicador de loading
+        }
+
         messagesPanel.add(Box.createVerticalGlue());
         JPanel inputPanel = new JPanel(new BorderLayout());
         inputPanel.add(inputArea, BorderLayout.CENTER);

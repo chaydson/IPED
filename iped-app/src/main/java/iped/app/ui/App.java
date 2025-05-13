@@ -193,6 +193,8 @@ import java.awt.FlowLayout;
 import javax.swing.Timer;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 
 public class App extends JFrame implements WindowListener, IMultiSearchResultProvider, GUIProvider {
     /**
@@ -1416,9 +1418,20 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
 
         // Novo layout estilo chat GPT
         chatPanel = new JPanel(new BorderLayout());
-        messagesPanel = new JPanel();
-        messagesPanel.setLayout(new BoxLayout(messagesPanel, BoxLayout.Y_AXIS));
-        JScrollPane scrollPane = new JScrollPane(messagesPanel);
+        messagesPanel = new JPanel() {
+            @Override
+            public Dimension getPreferredSize() {
+                return getLayout() == null ? super.getPreferredSize() : getLayout().preferredLayoutSize(this);
+            }
+        };
+        messagesPanel.setLayout(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(5, 5, 5, 5); // Espaçamento fixo de 5 pixels em todas as direções
+        JPanel messagesContainer = new JPanel(new BorderLayout());
+        messagesContainer.add(messagesPanel, BorderLayout.NORTH);
+        JScrollPane scrollPane = new JScrollPane(messagesContainer);
         chatPanel.add(scrollPane, BorderLayout.CENTER);
         // Input na parte inferior
         JPanel inputPanel = new JPanel(new BorderLayout());
@@ -2277,12 +2290,14 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         if (messagesPanel == null) return;
         
         messagesPanel.removeAll();
-        messagesPanel.setLayout(new BoxLayout(messagesPanel, BoxLayout.Y_AXIS));
-        
-        JScrollPane scrollPane = new JScrollPane(messagesPanel);
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        
+        messagesPanel.setLayout(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(5, 5, 5, 5); // Espaçamento fixo de 5 pixels em todas as direções
+        JPanel messagesContainer = new JPanel(new BorderLayout());
+        messagesContainer.add(messagesPanel, BorderLayout.NORTH);
+        JScrollPane scrollPane = new JScrollPane(messagesContainer);
         chatPanel.removeAll();
         chatPanel.setLayout(new BorderLayout());
         chatPanel.add(scrollPane, BorderLayout.CENTER);
@@ -2301,13 +2316,21 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
             msgArea.setBackground(msg.isUser ? new Color(220, 248, 198) : new Color(232, 232, 232));
             msgArea.setBorder(javax.swing.BorderFactory.createEmptyBorder(5, 8, 5, 8));
             msgArea.setFont(messagesPanel.getFont());
-            msgArea.setColumns(30); // Aproximadamente 350px
+            msgArea.setColumns(30);
             msgArea.setSize(bubbleWidth, Short.MAX_VALUE);
             msgArea.setPreferredSize(new Dimension(bubbleWidth, msgArea.getPreferredSize().height));
             msgArea.setMaximumSize(new Dimension(bubbleWidth, Integer.MAX_VALUE));
             msgPanel.add(msgArea);
-            messagesPanel.add(msgPanel);
-            messagesPanel.add(Box.createVerticalStrut(5)); // Espaçamento fixo de 5 pixels
+
+            // Ajusta o GridBagConstraints baseado no tipo de mensagem
+            GridBagConstraints msgGbc = new GridBagConstraints();
+            msgGbc.gridwidth = GridBagConstraints.REMAINDER;
+            msgGbc.fill = GridBagConstraints.HORIZONTAL;
+            msgGbc.insets = new Insets(5, 5, 5, 5);
+            msgGbc.anchor = msg.isUser ? GridBagConstraints.LINE_END : GridBagConstraints.LINE_START;
+            msgGbc.weightx = 1.0;
+            
+            messagesPanel.add(msgPanel, msgGbc);
             
             if (!msg.isUser) {
                 isFirstBotMessage = false;
@@ -2319,11 +2342,17 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
             JPanel loadingPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
             loadingPanel.setOpaque(false);
             loadingPanel.add(loadingLabel);
-            messagesPanel.add(loadingPanel);
-            messagesPanel.add(Box.createVerticalStrut(5)); // Mesmo espaçamento para o indicador de loading
+            
+            GridBagConstraints loadingGbc = new GridBagConstraints();
+            loadingGbc.gridwidth = GridBagConstraints.REMAINDER;
+            loadingGbc.fill = GridBagConstraints.HORIZONTAL;
+            loadingGbc.insets = new Insets(5, 5, 5, 5);
+            loadingGbc.anchor = GridBagConstraints.LINE_START;
+            loadingGbc.weightx = 1.0;
+            
+            messagesPanel.add(loadingPanel, loadingGbc);
         }
 
-        messagesPanel.add(Box.createVerticalGlue());
         JPanel inputPanel = new JPanel(new BorderLayout());
         inputPanel.add(inputArea, BorderLayout.CENTER);
         chatPanel.add(inputPanel, BorderLayout.SOUTH);

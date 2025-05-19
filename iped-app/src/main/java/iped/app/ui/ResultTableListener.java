@@ -71,6 +71,7 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
     private static Logger logger = LoggerFactory.getLogger(ResultTableListener.class);
     private static final String IP = "10.61.82.59";
     private static final String OPENAI_BASE_URL = "http://" + IP + ":11434/v1/chat/completions";
+    private static final String API_URL = "http://127.0.0.1:8000/api/chat";
     private static final String OPENAI_API_KEY = "teste";
     private static final String CHAT_MODEL = "hf.co/bartowski/mistralai_Mistral-Small-3.1-24B-Instruct-2503-GGUF:Q4_K_M";
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -259,7 +260,7 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
                                 
                                 // Store clean chat content for later use
                                 if (chatContent.contains("incoming from")) {
-                                    String cleanContent = stripHtmlTags(chatContent);
+                                    String cleanContent = chatContent;
                                     App.get().setCurrentChatText(cleanContent);
                                     logger.info("Clean Chat Content (HTML removed):");
                                     logger.info(cleanContent);
@@ -613,44 +614,20 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
             HttpClient client = HttpClient.newBuilder()
                 .build();
             
-            // Prepare messages array
-            List<Map<String, String>> messages = new ArrayList<>();
-            messages.add(Map.of(
-                "role", "system",
-                "content", "You are a helpful assistant that answer user questions strictly based on the given chat excerpt summaries."
-            ));
-            
-            messages.add(Map.of(
-                "role", "user",
-                "content", String.format(
-                    "This is a WhatsApp chat:\n\n" +
-                    "<chat>\n%s\n</chat>\n\n" +
-                    "Answer the following question in portuguese pt-BR STRICTLY based on the given chat excerpt, " +
-                    "quoting the chat id in this format: id_%s\n\n" +
-                    "<question>%s</question>",
-                    chatContent, 
-                    chatContent.split("\n")[0].replace("=== WhatsApp Chat - ", "").split(" ")[0],
-                    userQuestion
-                )
-            ));
-            
-            // Create request body matching Python implementation
+            // Create request body for the new API
             Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("model", CHAT_MODEL);
-            requestBody.put("messages", messages);
-            requestBody.put("stream", false);
-            requestBody.put("max_tokens", 250);
+            requestBody.put("chat_content", chatContent);
+            requestBody.put("user_question", userQuestion);
             
             // Create HTTP request
             HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(OPENAI_BASE_URL))
+                .uri(URI.create(API_URL))
                 .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + OPENAI_API_KEY)
                 .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
                 .build();
             
             logger.info("Sending request to API: {}", objectMapper.writeValueAsString(requestBody));
-            logger.info("Request URL: {}", OPENAI_BASE_URL);
+            logger.info("Request URL: {}", API_URL);
             
             // Send request and get response
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
@@ -668,13 +645,10 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
 
             // Parse the response and extract the assistant's message
             Map<String, Object> responseMap = objectMapper.readValue(response.body(), Map.class);
-            List<Map<String, Object>> choices = (List<Map<String, Object>>) responseMap.get("choices");
-            if (choices != null && !choices.isEmpty()) {
-                Map<String, Object> choice = choices.get(0);
-                Map<String, String> message = (Map<String, String>) choice.get("message");
-                String content = message.get("content");
-                
-                // Update the chat with the API response
+            String content = (String) responseMap.get("response");
+            
+            // Update the chat with the API response
+            if (content != null) {
                 SwingUtilities.invokeLater(() -> {
                     App.get().updateChatText(content);
                 });

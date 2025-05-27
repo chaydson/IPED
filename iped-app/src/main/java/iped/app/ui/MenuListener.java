@@ -25,6 +25,7 @@ import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -432,6 +433,21 @@ public class MenuListener implements ActionListener {
 
         } else if (e.getSource() == menu.createReport) {
             new ReportDialog().setVisible();
+
+        } else if (e.getSource() == menu.addToAIContext) {
+            int selIdx = App.get().resultsTable.getSelectedRow();
+            if (selIdx != -1) {
+                IItemId itemId = App.get().ipedResult.getItem(App.get().resultsTable.convertRowIndexToModel(selIdx));
+                IItem item = App.get().appCase.getItemByItemId(itemId);
+                if (item != null) {
+                    try {
+                        String content = new String(item.getBufferedInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                        App.get().setCurrentChatText(content);
+                    } catch (IOException ex) {
+                        LOGGER.error("Error reading item content", ex);
+                    }
+                }
+            }
 
         } else if (e.getSource() == menu.lastColLayout) {
             ColumnsManagerUI.getInstance().resetToLastLayout();

@@ -49,7 +49,7 @@ public class MenuClass extends JPopupMenu {
             checkHighlightedAndSubItems, uncheckHighlightedAndSubItems, checkHighlightedAndParent, uncheckHighlightedAndParent, checkHighlightedAndReferences, uncheckHighlightedAndReferences, checkHighlightedAndReferencedBy, uncheckHighlightedAndReferencedBy,
             changeGalleryColCount, defaultLayout, changeLayout, previewScreenshot, manageBookmarks, clearSearchHistory, importKeywords, navigateToParent, exportTerms, manageFilters, manageColumns, exportCheckedToZip, exportCheckedTreeToZip,
             exportTree, exportTreeChecked, similarDocs, openViewfile, createReport, resetColLayout, lastColLayout, saveColLayout, addToGraph, navigateToParentChat, pinFirstColumns, similarImagesCurrent, similarImagesExternal,
-            similarFacesCurrent, similarFacesExternal, toggleTimelineView, uiZoom, catIconSize, savePanelsLayout, loadPanelsLayout;
+            similarFacesCurrent, similarFacesExternal, toggleTimelineView, uiZoom, catIconSize, savePanelsLayout, loadPanelsLayout, addToAIContext;
 
     MenuListener menuListener = new MenuListener(this);
     boolean isTreeMenu;
@@ -325,6 +325,11 @@ public class MenuClass extends JPopupMenu {
         openViewfile.addActionListener(menuListener);
         openViewfile.setEnabled(item != null && item.getViewFile() != null);
         this.add(openViewfile);
+
+        this.addSeparator();
+        addToAIContext = new JMenuItem(Messages.getString("MenuClass.AddToAIContext")); //$NON-NLS-1$
+        addToAIContext.addActionListener(menuListener);
+        this.add(addToAIContext);
 
         this.addSeparator();
         addToGraph = new JMenuItem(Messages.getString("MenuClass.AddToGraph")); //$NON-NLS-1$

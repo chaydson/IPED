@@ -202,7 +202,7 @@ class WhatsAppChatTask:
         self.chats = []
 
         self.pipeline = ContextualEmbeddingPipeline(
-            base_url="http://localhost:11434/v1",
+            base_url="http://10.61.82.59:11434/v1",
             api_key="teste",
             chat_model="qwen3:14b",    # Example
             embed_model="nomic-embed-text:latest",

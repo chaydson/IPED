@@ -195,6 +195,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.GridLayout;
 
 public class App extends JFrame implements WindowListener, IMultiSearchResultProvider, GUIProvider {
     /**
@@ -332,7 +333,9 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
     private JPanel chatPanel;
     private JPanel messagesPanel;
     private JTextArea inputArea;
+    private JTextArea inputArea2; // Novo input
     private JButton sendButton;
+    private JButton sendButton2; // Novo botão de envio
     private List<String> userMessages = new LinkedList<>();
     private List<String> botMessages = new LinkedList<>();
     private String currentChatText = "";
@@ -342,6 +345,8 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
     private Executor executor = Executors.newSingleThreadExecutor();
 
     private App() {
+        // Adiciona mensagem de boas-vindas inicial
+        chatMessages.add(new ChatMessage("Fala, Perito! Sou o assistente do IPED, como posso te ajudar?", false));
     }
 
     public String getCurrentChatText() {
@@ -350,6 +355,22 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
 
     public void setCurrentChatText(String text) {
         this.currentChatText = text;
+    }
+
+    public String getInputAreaText() {
+        return inputArea.getText();
+    }
+
+    public void setInputAreaText(String text) {
+        inputArea.setText(text);
+    }
+
+    public String getInputArea2Text() {
+        return inputArea2.getText();
+    }
+
+    public void setInputArea2Text(String text) {
+        inputArea2.setText(text);
     }
 
     private void createLoadingIndicator() {
@@ -1428,11 +1449,12 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.gridwidth = GridBagConstraints.REMAINDER;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.insets = new Insets(5, 5, 5, 5); // Espaçamento fixo de 5 pixels em todas as direções
+        gbc.insets = new Insets(5, 5, 5, 5);
         JPanel messagesContainer = new JPanel(new BorderLayout());
         messagesContainer.add(messagesPanel, BorderLayout.NORTH);
         JScrollPane scrollPane = new JScrollPane(messagesContainer);
         chatPanel.add(scrollPane, BorderLayout.CENTER);
+
         // Input na parte inferior
         JPanel inputPanel = new JPanel(new BorderLayout());
         inputArea = new JTextArea(3, 40);
@@ -1443,11 +1465,9 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
             public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
                     if (e.isShiftDown()) {
-                        // Shift+Enter: Insere quebra de linha
                         inputArea.append("\n");
                     } else {
-                        // Enter: Envia mensagem
-                        e.consume(); // Previne a quebra de linha padrão
+                        e.consume();
                         String text = inputArea.getText().trim();
                         if (!text.isEmpty()) {
                             addUserMessage(text);
@@ -1457,7 +1477,34 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
                 }
             }
         });
-        inputPanel.add(inputArea, BorderLayout.CENTER);
+
+        // Segundo input
+        inputArea2 = new JTextArea(3, 40);
+        inputArea2.setLineWrap(true);
+        inputArea2.setWrapStyleWord(true);
+        inputArea2.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    if (e.isShiftDown()) {
+                        inputArea2.append("\n");
+                    } else {
+                        e.consume();
+                        String text = inputArea2.getText().trim();
+                        if (!text.isEmpty()) {
+                            addUserMessage(text);
+                            inputArea2.setText("");
+                        }
+                    }
+                }
+            }
+        });
+
+        // Painel para os dois inputs
+        JPanel inputsContainer = new JPanel(new GridLayout(2, 1, 0, 5));
+        inputsContainer.add(inputArea);
+        inputsContainer.add(inputArea2);
+        inputPanel.add(inputsContainer, BorderLayout.CENTER);
         chatPanel.add(inputPanel, BorderLayout.SOUTH);
         chatDock = createDockable("chat", "Fala, Perito!", chatPanel);
         dockingControl.addDockable(chatDock);
@@ -1536,6 +1583,8 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
 
         if (isReset)
             setGalleryColCount(GalleryModel.defaultColCount);
+        
+        refreshChat();
     }
 
     private void adjustViewerLayout() {
@@ -2294,7 +2343,7 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.gridwidth = GridBagConstraints.REMAINDER;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.insets = new Insets(5, 5, 5, 5); // Espaçamento fixo de 5 pixels em todas as direções
+        gbc.insets = new Insets(5, 5, 5, 5);
         JPanel messagesContainer = new JPanel(new BorderLayout());
         messagesContainer.add(messagesPanel, BorderLayout.NORTH);
         JScrollPane scrollPane = new JScrollPane(messagesContainer);
@@ -2303,11 +2352,10 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         chatPanel.add(scrollPane, BorderLayout.CENTER);
         
         int bubbleWidth = 350;
-        boolean isFirstBotMessage = true;
         for (ChatMessage msg : chatMessages) {
             JPanel msgPanel = new JPanel(new FlowLayout(msg.isUser ? FlowLayout.RIGHT : FlowLayout.LEFT));
             msgPanel.setOpaque(false);
-            String prefix = msg.isUser ? "Você: " : (isFirstBotMessage ? "Fala, Perito! Sou o assistente do IPED, como posso te ajudar?\n" : "");
+            String prefix = msg.isUser ? "Você: " : "";
             JTextArea msgArea = new JTextArea(prefix + msg.text);
             msgArea.setLineWrap(true);
             msgArea.setWrapStyleWord(true);
@@ -2322,7 +2370,6 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
             msgArea.setMaximumSize(new Dimension(bubbleWidth, Integer.MAX_VALUE));
             msgPanel.add(msgArea);
 
-            // Ajusta o GridBagConstraints baseado no tipo de mensagem
             GridBagConstraints msgGbc = new GridBagConstraints();
             msgGbc.gridwidth = GridBagConstraints.REMAINDER;
             msgGbc.fill = GridBagConstraints.HORIZONTAL;
@@ -2331,13 +2378,8 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
             msgGbc.weightx = 1.0;
             
             messagesPanel.add(msgPanel, msgGbc);
-            
-            if (!msg.isUser) {
-                isFirstBotMessage = false;
-            }
         }
 
-        // Add loading indicator if visible
         if (loadingLabel != null && loadingLabel.isVisible()) {
             JPanel loadingPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
             loadingPanel.setOpaque(false);
@@ -2353,9 +2395,14 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
             messagesPanel.add(loadingPanel, loadingGbc);
         }
 
+        // Painel para os dois inputs
         JPanel inputPanel = new JPanel(new BorderLayout());
-        inputPanel.add(inputArea, BorderLayout.CENTER);
+        JPanel inputsContainer = new JPanel(new GridLayout(2, 1, 0, 5));
+        inputsContainer.add(inputArea);
+        inputsContainer.add(inputArea2);
+        inputPanel.add(inputsContainer, BorderLayout.CENTER);
         chatPanel.add(inputPanel, BorderLayout.SOUTH);
+        
         messagesPanel.revalidate();
         messagesPanel.repaint();
         chatPanel.revalidate();

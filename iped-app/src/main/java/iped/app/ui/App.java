@@ -2304,6 +2304,83 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
     }
 
     private List<ChatMessage> chatMessages = new LinkedList<>();
+    private List<String> chatNames = new LinkedList<>();
+    private List<Color> chatColors = new LinkedList<>();
+    private static final Color[] AVAILABLE_COLORS = {
+        new Color(255, 200, 200), // Vermelho claro
+        new Color(200, 255, 200), // Verde claro
+        new Color(200, 200, 255), // Azul claro
+        new Color(255, 255, 200), // Amarelo claro
+        new Color(255, 200, 255), // Rosa claro
+        new Color(200, 255, 255)  // Ciano claro
+    };
+
+    public void addChatName(String name) {
+        // Remove a verificação de duplicatas para permitir múltiplos chats
+        chatNames.add(name);
+        chatColors.add(AVAILABLE_COLORS[chatNames.size() % AVAILABLE_COLORS.length]);
+        updateChatNamesPanel();
+    }
+
+    public void removeChatName(String name) {
+        int index = chatNames.indexOf(name);
+        if (index != -1) {
+            chatNames.remove(index);
+            chatColors.remove(index);
+            updateChatNamesPanel();
+        }
+    }
+
+    private void updateChatNamesPanel() {
+        // Remove o painel antigo se existir
+        Component[] components = chatPanel.getComponents();
+        for (Component comp : components) {
+            if (comp instanceof JPanel && ((JPanel)comp).getComponentCount() > 0) {
+                Component firstChild = ((JPanel)comp).getComponent(0);
+                if (firstChild instanceof JPanel && ((JPanel)firstChild).getLayout() instanceof FlowLayout) {
+                    chatPanel.remove(comp);
+                    break;
+                }
+            }
+        }
+
+        JPanel namesPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
+        namesPanel.setOpaque(false);
+        
+        for (int i = 0; i < chatNames.size(); i++) {
+            final String name = chatNames.get(i);
+            final Color color = chatColors.get(i);
+            
+            JPanel namePanel = new JPanel(new BorderLayout(5, 0));
+            namePanel.setBackground(color);
+            namePanel.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
+            
+            JLabel nameLabel = new JLabel(name);
+            namePanel.add(nameLabel, BorderLayout.CENTER);
+            
+            JButton removeButton = new JButton("×");
+            removeButton.setFont(removeButton.getFont().deriveFont(16f));
+            removeButton.setBorderPainted(false);
+            removeButton.setContentAreaFilled(false);
+            removeButton.setFocusPainted(false);
+            removeButton.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+            removeButton.addActionListener(e -> {
+                removeChatName(name);
+                chatPanel.revalidate();
+                chatPanel.repaint();
+            });
+            namePanel.add(removeButton, BorderLayout.EAST);
+            
+            namesPanel.add(namePanel);
+        }
+        
+        // Adiciona o novo painel de nomes
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.add(namesPanel, BorderLayout.CENTER);
+        chatPanel.add(topPanel, BorderLayout.NORTH);
+        chatPanel.revalidate();
+        chatPanel.repaint();
+    }
 
     public void updateChatText(String newText) {
         if (chatLabel != null) {

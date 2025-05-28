@@ -443,11 +443,7 @@ public class MenuListener implements ActionListener {
                     try {
                         String content = new String(item.getBufferedInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
                         App.get().setCurrentChatText(content);
-                        String currentText = App.get().getInputAreaText();
-                        if (!currentText.isEmpty()) {
-                            currentText += ", ";
-                        }
-                        App.get().setInputAreaText(currentText + item.getName());
+                        App.get().addChatName(item.getName());
                     } catch (IOException ex) {
                         LOGGER.error("Error reading item content", ex);
                     }

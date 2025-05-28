@@ -333,9 +333,7 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
     private JPanel chatPanel;
     private JPanel messagesPanel;
     private JTextArea inputArea;
-    private JTextArea inputArea2; // Novo input
     private JButton sendButton;
-    private JButton sendButton2; // Novo botão de envio
     private List<String> userMessages = new LinkedList<>();
     private List<String> botMessages = new LinkedList<>();
     private String currentChatText = "";
@@ -363,14 +361,6 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
 
     public void setInputAreaText(String text) {
         inputArea.setText(text);
-    }
-
-    public String getInputArea2Text() {
-        return inputArea2.getText();
-    }
-
-    public void setInputArea2Text(String text) {
-        inputArea2.setText(text);
     }
 
     private void createLoadingIndicator() {
@@ -1478,33 +1468,7 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
             }
         });
 
-        // Segundo input
-        inputArea2 = new JTextArea(3, 40);
-        inputArea2.setLineWrap(true);
-        inputArea2.setWrapStyleWord(true);
-        inputArea2.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-                    if (e.isShiftDown()) {
-                        inputArea2.append("\n");
-                    } else {
-                        e.consume();
-                        String text = inputArea2.getText().trim();
-                        if (!text.isEmpty()) {
-                            addUserMessage(text);
-                            inputArea2.setText("");
-                        }
-                    }
-                }
-            }
-        });
-
-        // Painel para os dois inputs
-        JPanel inputsContainer = new JPanel(new GridLayout(2, 1, 0, 5));
-        inputsContainer.add(inputArea);
-        inputsContainer.add(inputArea2);
-        inputPanel.add(inputsContainer, BorderLayout.CENTER);
+        inputPanel.add(inputArea, BorderLayout.CENTER);
         chatPanel.add(inputPanel, BorderLayout.SOUTH);
         chatDock = createDockable("chat", "Fala, Perito!", chatPanel);
         dockingControl.addDockable(chatDock);
@@ -2472,12 +2436,9 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
             messagesPanel.add(loadingPanel, loadingGbc);
         }
 
-        // Painel para os dois inputs
+        // Painel para o input
         JPanel inputPanel = new JPanel(new BorderLayout());
-        JPanel inputsContainer = new JPanel(new GridLayout(2, 1, 0, 5));
-        inputsContainer.add(inputArea);
-        inputsContainer.add(inputArea2);
-        inputPanel.add(inputsContainer, BorderLayout.CENTER);
+        inputPanel.add(inputArea, BorderLayout.CENTER);
         chatPanel.add(inputPanel, BorderLayout.SOUTH);
         
         messagesPanel.revalidate();

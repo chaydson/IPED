@@ -2280,7 +2280,15 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
     };
 
     public void addChatName(String name) {
-        // Remove a verificação de duplicatas para permitir múltiplos chats
+        // Verifica se o chat já existe
+        if (chatNames.contains(name)) {
+            JOptionPane.showMessageDialog(this,
+                "Este chat já foi adicionado ao contexto.",
+                "Chat Duplicado",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
         chatNames.add(name);
         chatColors.add(AVAILABLE_COLORS[chatNames.size() % AVAILABLE_COLORS.length]);
         updateChatNamesPanel();
@@ -2379,6 +2387,19 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
     private void refreshChat() {
         if (messagesPanel == null) return;
         
+        // Preserva o painel de nomes dos chats
+        JPanel namesPanel = null;
+        Component[] components = chatPanel.getComponents();
+        for (Component comp : components) {
+            if (comp instanceof JPanel && ((JPanel)comp).getComponentCount() > 0) {
+                Component firstChild = ((JPanel)comp).getComponent(0);
+                if (firstChild instanceof JPanel && ((JPanel)firstChild).getLayout() instanceof FlowLayout) {
+                    namesPanel = (JPanel)comp;
+                    break;
+                }
+            }
+        }
+        
         messagesPanel.removeAll();
         messagesPanel.setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
@@ -2388,8 +2409,16 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         JPanel messagesContainer = new JPanel(new BorderLayout());
         messagesContainer.add(messagesPanel, BorderLayout.NORTH);
         JScrollPane scrollPane = new JScrollPane(messagesContainer);
+        
+        // Remove todos os componentes exceto o painel de nomes
         chatPanel.removeAll();
         chatPanel.setLayout(new BorderLayout());
+        
+        // Readiciona o painel de nomes se existir
+        if (namesPanel != null) {
+            chatPanel.add(namesPanel, BorderLayout.NORTH);
+        }
+        
         chatPanel.add(scrollPane, BorderLayout.CENTER);
         
         int bubbleWidth = 350;

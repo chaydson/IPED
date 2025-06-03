@@ -217,7 +217,28 @@ public class IndexItem extends BasicProps {
             UTF8Properties props = new UTF8Properties();
             props.load(metadataTypesFile);
             for (String key : props.stringPropertyNames()) {
-                MetadataUtil.setMetadataType(key, Class.forName(props.getProperty(key)));
+                String className = props.getProperty(key);
+                Class<?> clazz;
+                if (className.equals("double[]")) {
+                    clazz = double[].class;
+                } else if (className.equals("float[]")) {
+                    clazz = float[].class;
+                } else if (className.equals("int[]")) {
+                    clazz = int[].class;
+                } else if (className.equals("long[]")) {
+                    clazz = long[].class;
+                } else if (className.equals("byte[]")) {
+                    clazz = byte[].class;
+                } else if (className.equals("short[]")) {
+                    clazz = short[].class;
+                } else if (className.equals("boolean[]")) {
+                    clazz = boolean[].class;
+                } else if (className.equals("char[]")) {
+                    clazz = char[].class;
+                } else {
+                    clazz = Class.forName(className);
+                }
+                MetadataUtil.setMetadataType(key, clazz);
             }
         }
     }

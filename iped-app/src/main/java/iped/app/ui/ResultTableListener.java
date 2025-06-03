@@ -63,6 +63,8 @@ import iped.viewers.ATextViewer;
 import iped.viewers.components.HitsTableModel;
 import iped.viewers.util.ProgressDialog;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import iped.search.SearchResult;
+import iped.properties.ExtraProperties;
 
 public class ResultTableListener implements ListSelectionListener, MouseListener, KeyListener {
 
@@ -595,9 +597,42 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
             HttpClient client = HttpClient.newBuilder()
                 .build();
             
-            // Create request body for the new API
+            // Get the list of chats in context
+            List<IItem> contextChats = App.get().getContextChatItems();
+            String contentToSend;
+            
+            if (contextChats.isEmpty()) {
+                // If no chats in context, send summaries of all chats
+                contentToSend = getAllChatSummaries();
+            } else if (contextChats.size() == 1) {
+                // If only one chat in context, send its full content
+                try {
+                    IItem chat = contextChats.get(0);
+                    contentToSend = new String(chat.getBufferedInputStream().readAllBytes(), 
+                        java.nio.charset.StandardCharsets.UTF_8);
+                } catch (IOException e) {
+                    logger.error("Error reading chat content", e);
+                    contentToSend = "";
+                }
+            } else {
+                // If multiple chats in context, send their summaries
+                StringBuilder summaries = new StringBuilder();
+                for (IItem chat : contextChats) {
+                    String[] chunkSummaries = chat.getMetadata().getValues(ExtraProperties.CHUNK_SUMMARY);
+                    if (chunkSummaries != null && chunkSummaries.length > 0) {
+                        summaries.append("Chat: ").append(chat.getName()).append("\n");
+                        for (String summary : chunkSummaries) {
+                            summaries.append(summary).append("\n");
+                        }
+                        summaries.append("\n");
+                    }
+                }
+                contentToSend = summaries.toString();
+            }
+            
+            // Create request body for the API
             Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("chat_content", chatContent);
+            requestBody.put("chat_content", contentToSend);
             requestBody.put("user_question", userQuestion);
             
             // Create HTTP request
@@ -629,16 +664,73 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
             String content = (String) responseMap.get("response");
             
             // Update the chat with the API response
-            if (content != null) {
-                SwingUtilities.invokeLater(() -> {
-                    App.get().updateChatText(content);
-                });
-            }
+            App.get().updateChatText(content);  // Changed to use updateChatText
             
         } catch (Exception e) {
-            logger.error("Error sending chat to API", e);
-            logger.error("Exception details:", e);
+            logger.error("Error sending request to API", e);
+            App.get().updateChatText("Desculpe, ocorreu um erro ao processar sua solicitação.");  // Changed to use updateChatText
         }
+    }
+
+    private static String getAllChatSummaries() {
+        StringBuilder summaries = new StringBuilder();
+        try {
+            // Search for all WhatsApp chats
+            IPEDSearcher searcher = new IPEDSearcher(App.get().appCase);
+            searcher.setQuery("mediaType:whatsapp-chat");
+            MultiSearchResult result = searcher.multiSearch();
+            
+            for (IItemId itemId : result.getIterator()) {
+                IItem item = App.get().appCase.getItemByItemId(itemId);
+                if (item != null) {
+                    String[] chunkSummaries = item.getMetadata().getValues(ExtraProperties.CHUNK_SUMMARY);
+                    if (chunkSummaries != null && chunkSummaries.length > 0) {
+                        summaries.append("Chat: ").append(item.getName()).append("\n");
+                        for (String summary : chunkSummaries) {
+                            summaries.append(summary).append("\n");
+                        }
+                        summaries.append("\n");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error getting all chat summaries", e);
+        }
+        return summaries.toString();
+    }
+
+    private static String getContextChatSummaries(List<String> contextChats) {
+        StringBuilder summaries = new StringBuilder();
+        try {
+            for (String chatName : contextChats) {
+                // Search for the specific chat
+                IPEDSearcher searcher = new IPEDSearcher(App.get().appCase);
+                searcher.setQuery("mediaType:whatsapp-chat AND name:\"" + chatName + "\"");
+                MultiSearchResult result = searcher.multiSearch();
+                
+                if (result.getLength() > 0) {
+                    IItemId itemId = result.getIterator().iterator().next();  // Added .iterator() to get the actual iterator
+                    IItem item = App.get().appCase.getItemByItemId(itemId);
+                    if (item != null) {
+                        Object chunkSummaries = item.getExtraAttribute(ExtraProperties.CHUNK_SUMMARY);
+                        if (chunkSummaries != null) {
+                            summaries.append("Chat: ").append(chatName).append("\n");
+                            if (chunkSummaries instanceof List) {
+                                for (Object summary : (List<?>)chunkSummaries) {
+                                    summaries.append(summary.toString()).append("\n");
+                                }
+                            } else {
+                                summaries.append(chunkSummaries.toString()).append("\n");
+                            }
+                            summaries.append("\n");
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error getting context chat summaries", e);
+        }
+        return summaries.toString();
     }
 
 }

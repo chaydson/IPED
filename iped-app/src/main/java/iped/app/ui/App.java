@@ -2270,6 +2270,8 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
     private List<ChatMessage> chatMessages = new LinkedList<>();
     private List<String> chatNames = new LinkedList<>();
     private List<Color> chatColors = new LinkedList<>();
+    private List<IItem> contextChatItems = new ArrayList<>();
+    
     private static final Color[] AVAILABLE_COLORS = {
         new Color(255, 200, 200), // Vermelho claro
         new Color(200, 255, 200), // Verde claro
@@ -2278,6 +2280,10 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
         new Color(255, 200, 255), // Rosa claro
         new Color(200, 255, 255)  // Ciano claro
     };
+
+    public List<String> getContextChatNames() {
+        return new ArrayList<>(chatNames);  // Return a copy to prevent external modification
+    }
 
     public void addChatName(String name) {
         // Verifica se o chat já existe
@@ -2375,12 +2381,22 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
             // Show loading indicator
             showLoading();
             
-            // Send to API with the current chat text and user's question
-            if (!currentChatText.isEmpty()) {
-                executor.execute(() -> {
+            // Get the list of chats in context
+            List<String> contextChats = getContextChatNames();
+            
+            // Send to API with the appropriate context
+            executor.execute(() -> {
+                if (contextChats.isEmpty()) {
+                    // If no chats in context, send summaries of all chats
+                    ResultTableListener.sendToOpenAI("", text);
+                } else if (contextChats.size() == 1) {
+                    // If only one chat in context, send its content
                     ResultTableListener.sendToOpenAI(currentChatText, text);
-                });
-            }
+                } else {
+                    // If multiple chats in context, send their summaries
+                    ResultTableListener.sendToOpenAI("", text); // The summaries will be fetched in sendToOpenAI
+                }
+            });
         }
     }
 
@@ -2481,5 +2497,27 @@ public class App extends JFrame implements WindowListener, IMultiSearchResultPro
 
     public DefaultSingleCDockable getChatDock() {
         return chatDock;
+    }
+
+    public List<IItem> getContextChatItems() {
+        return contextChatItems;
+    }
+
+    public void setContextChatItems(List<IItem> items) {
+        this.contextChatItems = items;
+    }
+
+    public void clearContextChatItems() {
+        this.contextChatItems.clear();
+    }
+
+    public void removeContextChatItem(IItem item) {
+        this.contextChatItems.remove(item);
+    }
+
+    public void addContextChatItem(IItem item) {
+        if (!this.contextChatItems.contains(item)) {
+            this.contextChatItems.add(item);
+        }
     }
 }

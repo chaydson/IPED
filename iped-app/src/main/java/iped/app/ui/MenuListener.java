@@ -436,19 +436,14 @@ public class MenuListener implements ActionListener {
 
         } else if (e.getSource() == menu.addToAIContext) {
             int[] selectedRows = App.get().resultsTable.getSelectedRows();
-            List<IItem> selectedChats = new ArrayList<>();
             
             for (int selIdx : selectedRows) {
                 IItemId itemId = App.get().ipedResult.getItem(App.get().resultsTable.convertRowIndexToModel(selIdx));
                 IItem item = App.get().appCase.getItemByItemId(itemId);
                 if (item != null && item.getName().contains("WhatsApp Chat")) {
-                    selectedChats.add(item);
                     App.get().addChatName(item.getName());
+                    App.get().addContextChatItem(item);
                 }
-            }
-            
-            if (!selectedChats.isEmpty()) {
-                App.get().setContextChatItems(selectedChats);
             }
 
         } else if (e.getSource() == menu.lastColLayout) {

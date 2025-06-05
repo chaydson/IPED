@@ -215,46 +215,20 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
             int docId = App.get().appCase.getLuceneId(item);
             int lastAppDoc = App.get().getLastSelectedDoc();
 
-            // Log all fields of the selected item
+            // Log only metadata fields, not content
             if (item != null) {
                 IItem selectedItem = App.get().appCase.getItemByItemId(item);
                 if (selectedItem != null) {
-                    logger.info("Selected item fields:");
                     try {
                         Document doc = App.get().appCase.getSearcher().doc(docId);
+                        logger.info("Selected item metadata:");
                         for (org.apache.lucene.index.IndexableField field : doc.getFields()) {
-                            logger.info("Field: {} = {}", field.name(), field.stringValue());
-                        }
-
-                        // Extract chat content
-                        if (selectedItem.getName().contains("WhatsApp Chat")) {
-                            logger.info("Extracting chat content...");
-                            try (java.io.InputStream inputStream = selectedItem.getBufferedInputStream()) {
-                                byte[] bytes = inputStream.readAllBytes();
-                                String chatContent = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-                                
-                                // Log chat metadata
-                                logger.info("Chat Metadata:");
-                                logger.info("Chat Type: {}", doc.get("ufed:ChatType"));
-                                logger.info("Phone Owner: {}", doc.get("ufed:phoneOwner"));
-                                logger.info("Participants: {}", doc.get("ufed:Participants"));
-                                logger.info("Source: {}", doc.get("ufed:Source"));
-                                logger.info("Chat ID: {}", selectedItem.getName());
-                                
-                                // Store clean chat content for later use
-                                if (chatContent.contains("incoming from")) {
-                                    String cleanContent = chatContent;
-                                    App.get().setCurrentChatText(cleanContent);
-                                    logger.info("Clean Chat Content (HTML removed):");
-                                    logger.info(cleanContent);
-                                } else {
-                                    App.get().setCurrentChatText("");
-                                    logger.info("No conversation found in this chat");
-                                }
+                            if (!field.name().equals("content")) {  // Skip content field
+                                logger.info("Field: {} = {}", field.name(), field.stringValue());
                             }
                         }
                     } catch (IOException e) {
-                        logger.error("Error getting document fields or content", e);
+                        logger.error("Error getting document fields", e);
                     }
                 }
             }
@@ -597,43 +571,52 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
             HttpClient client = HttpClient.newBuilder()
                 .build();
             
-            // Get the list of chats in context
-            List<IItem> contextChats = App.get().getContextChatItems();
+            // Get the list of chats in context using the same method as App.java
+            List<String> contextChatNames = App.get().getContextChatNames();
+            List<IItem> contextChatItems = App.get().getContextChatItems();
             String contentToSend;
             
-            if (contextChats.isEmpty()) {
+            if (contextChatNames.isEmpty()) {
                 // If no chats in context, send summaries of all chats
                 contentToSend = getAllChatSummaries();
-            } else if (contextChats.size() == 1) {
+                logger.info("Sending request to API with all chat summaries");
+            } else if (contextChatNames.size() == 1) {
                 // If only one chat in context, send its full content
                 try {
-                    IItem chat = contextChats.get(0);
+                    IItem chat = contextChatItems.get(0);
                     contentToSend = new String(chat.getBufferedInputStream().readAllBytes(), 
                         java.nio.charset.StandardCharsets.UTF_8);
+                    logger.info("Sending request to API with single chat content: {}", chat.getName());
                 } catch (IOException e) {
                     logger.error("Error reading chat content", e);
                     contentToSend = "";
                 }
             } else {
-                // If multiple chats in context, send their summaries
-                StringBuilder summaries = new StringBuilder();
-                for (IItem chat : contextChats) {
+                // If multiple chats in context, send their summaries using getContextChatSummaries
+                contentToSend = getContextChatSummaries(contextChatNames);
+                // Log the chunks summaries that were sent
+                logger.info("Sending multiple chat summaries to API:");
+                for (IItem chat : contextChatItems) {
                     String[] chunkSummaries = chat.getMetadata().getValues(ExtraProperties.CHUNK_SUMMARY);
                     if (chunkSummaries != null && chunkSummaries.length > 0) {
-                        summaries.append("Chat: ").append(chat.getName()).append("\n");
+                        logger.info("Chat: {}", chat.getName());
                         for (String summary : chunkSummaries) {
-                            summaries.append(summary).append("\n");
+                            logger.info("Summary: {}", summary);
                         }
-                        summaries.append("\n");
                     }
                 }
-                contentToSend = summaries.toString();
             }
             
             // Create request body for the API
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("chat_content", contentToSend);
             requestBody.put("user_question", userQuestion);
+            
+            // Log the exact content being sent
+            logger.info("Content being sent to API:");
+            logger.info("=== START OF CONTENT ===");
+            logger.info(contentToSend);
+            logger.info("=== END OF CONTENT ===");
             
             // Create HTTP request
             HttpRequest request = HttpRequest.newBuilder()
@@ -642,8 +625,13 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
                 .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
                 .build();
             
-            logger.info("Sending request to API: {}", objectMapper.writeValueAsString(requestBody));
-            logger.info("Request URL: {}", API_URL);
+            // Only log the request body if it's not multiple chats (to avoid logging HTML content)
+            if (contextChatNames.size() != 1) {
+                logger.info("Request URL: {}", API_URL);
+            } else {
+                logger.info("Sending request to API: {}", objectMapper.writeValueAsString(requestBody));
+                logger.info("Request URL: {}", API_URL);
+            }
             
             // Send request and get response
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
@@ -699,38 +687,101 @@ public class ResultTableListener implements ListSelectionListener, MouseListener
         return summaries.toString();
     }
 
-    private static String getContextChatSummaries(List<String> contextChats) {
+    private static String getContextChatSummaries(List<String> contextChatNames) {
         StringBuilder summaries = new StringBuilder();
         try {
-            for (String chatName : contextChats) {
-                // Search for the specific chat
-                IPEDSearcher searcher = new IPEDSearcher(App.get().appCase);
-                searcher.setQuery("mediaType:whatsapp-chat AND name:\"" + chatName + "\"");
-                MultiSearchResult result = searcher.multiSearch();
-                
-                if (result.getLength() > 0) {
-                    IItemId itemId = result.getIterator().iterator().next();  // Added .iterator() to get the actual iterator
-                    IItem item = App.get().appCase.getItemByItemId(itemId);
-                    if (item != null) {
-                        Object chunkSummaries = item.getExtraAttribute(ExtraProperties.CHUNK_SUMMARY);
-                        if (chunkSummaries != null) {
-                            summaries.append("Chat: ").append(chatName).append("\n");
-                            if (chunkSummaries instanceof List) {
-                                for (Object summary : (List<?>)chunkSummaries) {
-                                    summaries.append(summary.toString()).append("\n");
-                                }
+            // Get the list of chat items from App.java
+            List<IItem> contextChatItems = App.get().getContextChatItems();
+            logger.info("Processing {} chat items for summaries", contextChatItems.size());
+            
+            // Verify we have the same number of items as names
+            if (contextChatItems.size() != contextChatNames.size()) {
+                logger.warn("Mismatch between context chat names ({}) and items ({})", 
+                    contextChatNames.size(), contextChatItems.size());
+            }
+            
+            for (IItem item : contextChatItems) {
+                if (item != null) {
+                    logger.info("Processing chat: {}", item.getName());
+                    
+                    // Try to get chunk summaries from metadata first (more reliable)
+                    String[] chunkSummaries = item.getMetadata().getValues(ExtraProperties.CHUNK_SUMMARY);
+                    
+                    // If not found in metadata, try extra attributes
+                    if (chunkSummaries == null || chunkSummaries.length == 0) {
+                        Object extraAttr = item.getExtraAttributeMap().get(ExtraProperties.CHUNK_SUMMARY);
+                        if (extraAttr != null) {
+                            if (extraAttr instanceof List) {
+                                List<?> list = (List<?>) extraAttr;
+                                chunkSummaries = list.stream()
+                                    .map(Object::toString)
+                                    .toArray(String[]::new);
+                            } else if (extraAttr instanceof String[]) {
+                                chunkSummaries = (String[]) extraAttr;
                             } else {
-                                summaries.append(chunkSummaries.toString()).append("\n");
+                                chunkSummaries = new String[] { extraAttr.toString() };
                             }
-                            summaries.append("\n");
+                            logger.info("Found chunk summaries in extra attributes for chat {}", item.getName());
                         }
+                    } else {
+                        logger.info("Found chunk summaries in metadata for chat {}", item.getName());
                     }
+                    
+                    if (chunkSummaries != null && chunkSummaries.length > 0) {
+                        logger.info("Found {} chunk summaries for chat {}", chunkSummaries.length, item.getName());
+                        
+                        // Log raw summaries before processing
+                        logger.info("Raw summaries for chat {}:", item.getName());
+                        for (String summary : chunkSummaries) {
+                            logger.info("Raw summary: {}", summary);
+                        }
+                        
+                        // Add chat header with clear separation
+                        summaries.append("\n=== Chat: ").append(item.getName()).append(" ===\n\n");
+                        
+                        // Process each summary
+                        for (String summary : chunkSummaries) {
+                            if (summary != null && !summary.trim().isEmpty()) {
+                                // Clean and format the summary
+                                String cleanSummary = summary.trim()
+                                    .replaceAll("\\s+", " ")  // Normalize whitespace
+                                    .replaceAll("\\n+", "\n") // Normalize newlines
+                                    .trim();
+                                
+                                if (!cleanSummary.isEmpty()) {
+                                    summaries.append(cleanSummary).append("\n");
+                                    logger.info("Processed summary for {}: {}", item.getName(), cleanSummary);
+                                }
+                            }
+                        }
+                    } else {
+                        logger.warn("No chunk summaries found for chat {}", item.getName());
+                    }
+                } else {
+                    logger.warn("Null chat item found in context");
                 }
             }
+            
+            String result = summaries.toString().trim();
+            logger.info("Final summaries length: {} characters", result.length());
+            
+            if (result.isEmpty()) {
+                logger.warn("No summaries were generated");
+                return "";
+            }
+            
+            // Ensure consistent line endings and no multiple blank lines
+            result = result.replaceAll("\\r\\n", "\n")
+                          .replaceAll("\\r", "\n")
+                          .replaceAll("\\n\\s*\\n", "\n")
+                          .trim();
+                          
+            return result;
+            
         } catch (Exception e) {
             logger.error("Error getting context chat summaries", e);
+            return "";
         }
-        return summaries.toString();
     }
 
 }
